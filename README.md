@@ -11,7 +11,9 @@ You can install the package from GitHub directly:
 With `uv` (recommended):
 ```sh
 # if the project is not initialized already
-uv unit
+uv init my-project
+cd my-project
+
 uv add git+https://github.com/CRCHUM-Epilepsy-Group/nkpy.git
 ```
 
