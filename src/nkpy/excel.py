@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
-from dataclasses import dataclass
+from copy import copy
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,16 +15,17 @@ if TYPE_CHECKING:
     from xlrd.book import Book
     from xlrd.sheet import Cell, Rowinfo, Sheet
 
-    PatientDict: TypeAlias = dict[str, list["VideoFile"]]
+    PatientDict: TypeAlias = dict[str, "Patient"]
 
     PatientInfoDict = TypedDict(
         "PatientInfoDict",
         {
             "ID": str,
-            "Birth Date": datetime,
             "Patient Name": str,
-            "Start": datetime,
-            "End": datetime,
+            "Sex": str,
+            "Birth Date": datetime,
+            "Start": datetime | None,
+            "End": datetime | None,
         },
     )
     VideoInfoDict = TypedDict(
@@ -49,6 +50,16 @@ LOG = logging.getLogger(__name__)
 
 
 class CorruptionError(Exception): ...
+
+
+@dataclass
+class Patient:
+    patient_id: str
+    patient_name: str
+    sex: str
+    birth_date: datetime
+    videos: list[VideoFile] = field(default_factory=list)
+    eegs: ... = field(default_factory=list)
 
 
 @dataclass
@@ -147,14 +158,23 @@ def read_excel(filename: str | Path) -> PatientDict:
         for patient_block in patient_blocks
     ]
 
-    videos: PatientDict = defaultdict(list)
+    patients: PatientDict = {}
     for patient_range, recording_ranges in zip(patient_blocks, recording_blocks):
         patient_info: PatientInfoDict = dict(
             zip(headers[0], parse_cells(patient_sheet.row(patient_range.start)))
         )  # type: ignore
+
         if 1 not in headers:
             LOG.debug("Reading headers[1]")
             headers[1] = parse_cells(patient_sheet.row(patient_range.start + 2))
+
+        patient = Patient(
+            patient_id=patient_info["ID"],
+            patient_name=patient_info["Patient Name"],
+            sex=patient_info["Sex"],
+            birth_date=patient_info["Birth Date"],
+        )
+        patients[patient.patient_id] = patient
 
         for recordings in recording_ranges:
             if 2 not in headers:
@@ -170,7 +190,7 @@ def read_excel(filename: str | Path) -> PatientDict:
                     zip(headers[2], parse_cells(patient_sheet.row(row)))
                 )  # type: ignore
 
-                videos[patient_info["ID"]].append(
+                patients[patient_info["ID"]].videos.append(
                     VideoFile(
                         path=Path(video_info["Path"]) / video_info["Video Name"],
                         start=video_info["Start"],
@@ -179,18 +199,28 @@ def read_excel(filename: str | Path) -> PatientDict:
                     )
                 )
         LOG.debug(
-            f"Found a total of {len(videos[patient_info['ID']]):>4d} videos "
+            f"Found a total of {len(patients[patient_info['ID']].videos):>4d} videos "
             f"for patient {patient_info['ID']}"
         )
 
-    return videos
+    return patients
 
 
 def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
-    merged_patient_dict: PatientDict = defaultdict(list)
+    merged_patient_dict: PatientDict = {}
     for patient_dict in patient_dicts:
-        for patient_id, videos in patient_dict.items():
-            merged_patient_dict[patient_id].extend(videos)
+        for patient_id, patient in patient_dict.items():
+            try:
+                merged_patient_dict[patient_id].videos.extend(patient.videos)
+            except KeyError:
+                # create a new Patient to avoid multiple reference issues
+                merged_patient_dict[patient_id] = Patient(
+                    patient_id=patient.patient_id,
+                    patient_name=patient.patient_name,
+                    sex=patient.sex,
+                    birth_date=patient.birth_date,
+                    videos=copy(patient.videos),
+                )
 
     return merged_patient_dict
 

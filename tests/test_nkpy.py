@@ -1,6 +1,8 @@
+from collections import Counter
 from pathlib import Path
 
 import pytest
+from rich import print
 
 import nkpy
 
@@ -18,13 +20,13 @@ def neuroworkbench_all_excels() -> list[Path]:
 
 
 def test_nkpy_read_excel(neuroworkbench_excel: Path) -> None:
-    nkpy.read_excel(neuroworkbench_excel)
+    _ = nkpy.read_excel(neuroworkbench_excel)
 
 
 def test_nkpy_read_excel_paths_exist(neuroworkbench_excel: Path) -> None:
     patients = nkpy.read_excel(neuroworkbench_excel)
-    for _, videos in patients.items():
-        for video in videos:
+    for _, patient in patients.items():
+        for video in patient.videos:
             assert video.path.exists()
 
 
@@ -33,23 +35,39 @@ def test_all_excel_files(neuroworkbench_all_excels: list[Path]) -> None:
         nkpy.read_excel(excel_file)
 
 
-def test_nkpy_merge_patient_dicts(neuroworkbench_all_excels: list[Path]) -> None:
+def test_nkpy_merge_patient_dicts_all_ids(
+    neuroworkbench_all_excels: list[Path],
+) -> None:
     patient_dicts = [
         nkpy.read_excel(filename) for filename in neuroworkbench_all_excels
     ]
-    all_excels = nkpy.excel.merge_patient_dicts(*patient_dicts)
-    all_patients = set(all_excels.keys())
+    all_patients = nkpy.excel.merge_patient_dicts(*patient_dicts)
+    all_patient_ids = set(all_patients.keys())
 
     for patient_dict in patient_dicts:
         ids = set(patient_dict.keys())
-        assert (ids & all_patients) == ids
+        assert (ids & all_patient_ids) == ids
 
-    for patient_id, videos in all_excels.items():
+
+def test_nkpy_merge_patient_dicts_all_videos(
+    neuroworkbench_all_excels: list[Path],
+) -> None:
+    patient_dicts = [
+        nkpy.read_excel(filename) for filename in neuroworkbench_all_excels
+    ]
+    all_patients = nkpy.excel.merge_patient_dicts(*patient_dicts)
+
+    for patient_id in all_patients.keys():
         n_videos: int = 0
+        patient_videos = []
         for patient_dict in patient_dicts:
-            n_videos += len(patient_dict[patient_id])
-
-        assert n_videos == len(videos)
+            try:
+                n_videos += len(patient_dict[patient_id].videos)
+                patient_videos.extend([v.path for v in patient_dict[patient_id].videos])
+            except KeyError:
+                # patient not in this dict
+                pass
+        assert n_videos == len(all_patients[patient_id].videos), patient_id
 
 
 def test_nkpy_read_excels(neuroworkbench_all_excels: list[Path]) -> None:
