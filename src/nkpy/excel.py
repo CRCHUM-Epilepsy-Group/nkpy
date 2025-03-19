@@ -88,13 +88,13 @@ class VideoFile:
     Attributes
     ----------
     path : Path
-        ...
+        Full path to the video file.
     start : datetime
-        ...
+        Start time of the recording.
     end : datetime
-        ...
+        End time of the recording.
     clipped : bool
-        ...
+        If the video is a clipped event (True) or a full recording (False).
     """
 
     path: Path
