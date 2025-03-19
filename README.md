@@ -22,6 +22,10 @@ With `pip`:
 pip install git+https://github.com/CRCHUM-Epilepsy-Group/nkpy.git
 ```
 
+## Documentation
+
+[Documentation can be read here](https://crchum-epilepsy-group.github.io/nkpy/).
+
 
 ## Extracting Patient Information & Locating Video Data from Nihon Kohden NeuroWorkbench
 
