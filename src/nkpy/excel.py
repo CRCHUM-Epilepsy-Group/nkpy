@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 from copy import copy
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import xlrd
 
 if TYPE_CHECKING:
-    from typing import TYPE_CHECKING, Any, TypeAlias, TypedDict
+    from datetime import datetime
+    from typing import TYPE_CHECKING, Any, Self, TypeAlias, TypedDict
 
     from xlrd.book import Book
     from xlrd.sheet import Cell, Rowinfo, Sheet
@@ -43,6 +43,7 @@ __all__ = [
     "read_excel",
     "read_excels",
     "CorruptionError",
+    "Patient",
     "VideoFile",
 ]
 
@@ -54,6 +55,24 @@ class CorruptionError(Exception): ...
 
 @dataclass
 class Patient:
+    """Represent a patient in the Nihon Kohden' NeuroWorkbench database.
+
+    Attributes
+    ----------
+    patient_id : str
+        CHUM's patient ID (usually in the format Sxxxxxxxx with x being digits).
+    patient_name : str
+        The name of the patient, in the LAST NAME, FIRST NAME format.
+    sex : str
+        Biological sex of the patient ("Male", "Female", "Unknown").
+    birth_date : datetime
+        The date of birth of the patient.
+    videos : list[VideoFile]
+        A list of VideoFile, containing information about every video recording.
+    eegs : ...
+        Not Implemented.
+    """
+
     patient_id: str
     patient_name: str
     sex: str
@@ -64,10 +83,30 @@ class Patient:
 
 @dataclass
 class VideoFile:
+    """Represent a video file in the Nihon Kohden's NeuroWorkbench database.
+
+    Attributes
+    ----------
+    path : Path
+        ...
+    start : datetime
+        ...
+    end : datetime
+        ...
+    clipped : bool
+        ...
+    """
+
     path: Path
     start: datetime
     end: datetime
     clipped: bool
+
+    def __lt__(self, other: Self) -> bool:
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
+        return self.start < other.start
 
 
 @dataclass
@@ -76,6 +115,21 @@ class RowinfoProxy:
 
 
 def get_blocks(bool_list: list[bool], target_range: range | None = None) -> list[range]:
+    """Get the range of indices that contains continuous blocks of True values.
+
+    Parameters
+    ----------
+    bool_list : list[bool]
+        A list of boolean values
+    target_range : range | None, optional
+        A range where you will only look for the boolean blocks. A
+        bit like a slice, but will keep the indices coherent. By default None
+
+    Returns
+    -------
+    list[range]
+        A list of range where the continuous blocks of True values are.
+    """
     if target_range is None:
         target_range = range(len(bool_list))
 
@@ -100,6 +154,18 @@ def get_blocks(bool_list: list[bool], target_range: range | None = None) -> list
 
 
 def get_outline_levels(sheet: Sheet) -> list[int]:
+    """Get the indentation levels of collapsible blocks of the Excel sheet.
+
+    Parameters
+    ----------
+    sheet : Sheet
+        An instance of Excel sheet with clolapsible blocks,
+
+    Returns
+    -------
+    list[int]
+        A list of outline levels for each row in the Excel sheet.
+    """
     # Scanning for blocks based on collapse levels
     outline_levels: list[int] = []
     for i in range(sheet.nrows):
@@ -119,6 +185,24 @@ def get_outline_levels(sheet: Sheet) -> list[int]:
 
 
 def read_excel(filename: str | Path) -> PatientDict:
+    """Read an Excel sheet exported from Nihon Kohden's NeuroWorkbench
+
+    Parameters
+    ----------
+    filename : str | Path
+        The path to the Excel file, exported from NeuroWorkbench.
+
+    Returns
+    -------
+    PatientDict
+        A dictionnary of patient IDs to Patient objects.
+
+    Raises
+    ------
+    CorruptionError
+        Can happen in some cases where the Excel file cannot be read. It can be fixed
+        by opening the file in Excel, and saving it as-is (CTRL+S).
+    """
     try:
         workbook: Book = xlrd.open_workbook(str(filename), formatting_info=True)
         LOG.debug(f"Opened workbook {filename}")
@@ -202,11 +286,28 @@ def read_excel(filename: str | Path) -> PatientDict:
             f"Found a total of {len(patients[patient_info['ID']].videos):>4d} videos "
             f"for patient {patient_info['ID']}"
         )
+        patient.videos.sort()
 
     return patients
 
 
 def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
+    """Merge multiple PatientDict together. Patient data with the same ID are
+    merged together.
+
+    Parameters
+    ----------
+    *patient_dicts : PatientDict
+        A sequence of PatientDict, most likely extracted from multiple Excel files,
+        to be merged into one PatientDict
+
+    Returns
+    -------
+    PatientDict
+        A single PatientDict with the data from the provided PatientDict. Patients
+        the same ID with videos and EEGs across multiple PatientDict will be merged
+        together in one Patient instance.
+    """
     merged_patient_dict: PatientDict = {}
     for patient_dict in patient_dicts:
         for patient_id, patient in patient_dict.items():
@@ -226,4 +327,12 @@ def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
 
 
 def read_excels(*filenames: str | Path) -> PatientDict:
+    """Read multiple Excel files exported from Nihon Kohden's NeuroWorkbench
+    and return the data into a single PatientDict.
+
+    Returns
+    -------
+    PatientDict
+        A dictionnary of patient IDs to Patient objects.
+    """
     return merge_patient_dicts(*(read_excel(filename) for filename in filenames))
