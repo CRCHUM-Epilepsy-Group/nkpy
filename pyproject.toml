@@ -18,10 +18,10 @@
         "pytest>=8.3.5",
         "rich>=13.9.4",
     ]
-docs = [
-    "pydata-sphinx-theme>=0.16.1",
-    "sphinx>=8.2.3",
-]
+    docs = [
+        "pydata-sphinx-theme>=0.16.1",
+        "sphinx>=8.2.3",
+    ]
 
 [tool.pytest.ini_options]
     log_cli       = true
