@@ -12,5 +12,8 @@ wheels/
 # local uv configuration
 uv.toml
 
+# Sphinx documentation
+docs/_build/
+
 # config files
 tests/config.py
