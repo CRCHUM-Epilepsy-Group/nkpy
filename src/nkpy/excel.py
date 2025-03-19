@@ -50,7 +50,12 @@ __all__ = [
 LOG = logging.getLogger(__name__)
 
 
-class CorruptionError(Exception): ...
+class CorruptionError(Exception):
+    """Exception raised when reading an Excel file fails.
+
+    This is fixed by opening the file with Excel manually and saving it with no
+    modifications (CTRL+S).
+    """
 
 
 @dataclass
