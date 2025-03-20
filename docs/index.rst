@@ -14,9 +14,31 @@ Library to read patient information from extracted Excel files from Nihon Kohden
 
 Currently only extracts video information such as their path, start date and end date.
 
-.. automodule:: nkpy
-   :members:
-
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
+
+   excel
+   nkpy
+   examples
+
+Installation
+------------
+
+To install the package in your project, you have two options:
+
+With ``uv``
+^^^^^^^^^^^
+.. code-block:: bash
+
+   # if the project does not already exist
+   uv init my-project
+   cd my-project
+
+   uv add git+https://github.com/CRCHUM-Epilepsy-Group/nkpy.git
+
+With ``pip``
+^^^^^^^^^^^^
+.. code-block:: bash
+
+   pip install git+https://github.com/CRCHUM-Epilepsy-Group/nkpy.git

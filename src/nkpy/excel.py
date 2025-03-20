@@ -62,18 +62,21 @@ class CorruptionError(Exception):
 class Patient:
     """Represent a patient in the Nihon Kohden' NeuroWorkbench database.
 
+    These do not need to be created manually, and are instead returned by the
+    :func:`read_excel` and :func:`read_excels` functions.
+
     Attributes
     ----------
-    patient_id : str
+    patient_id : :class:`str`
         CHUM's patient ID (usually in the format Sxxxxxxxx with x being digits).
-    patient_name : str
+    patient_name : :class:`str`
         The name of the patient, in the LAST NAME, FIRST NAME format.
-    sex : str
+    sex : :class:`str`
         Biological sex of the patient ("Male", "Female", "Unknown").
-    birth_date : datetime
+    birth_date : :class:`datetime.datetime`
         The date of birth of the patient.
-    videos : list[VideoFile]
-        A list of VideoFile, containing information about every video recording.
+    videos : list[:class:`VideoFile`]
+        A list of :class:`VideoFile`, containing information about every video recording.
     eegs : ...
         Not Implemented.
     """
@@ -90,15 +93,18 @@ class Patient:
 class VideoFile:
     """Represent a video file in the Nihon Kohden's NeuroWorkbench database.
 
+    These do not need to be created manually, and are instead returned by the
+    :func:`read_excel` and :func:`read_excels` functions.
+
     Attributes
     ----------
-    path : Path
+    path : :class:`pathlib.Path`
         Full path to the video file.
-    start : datetime
+    start : :class:`datetime.datetime`
         Start time of the recording.
-    end : datetime
+    end : :class:`datetime.datetime`
         End time of the recording.
-    clipped : bool
+    clipped : :class:`bool`
         If the video is a clipped event (True) or a full recording (False).
     """
 
@@ -194,17 +200,17 @@ def read_excel(filename: str | Path) -> PatientDict:
 
     Parameters
     ----------
-    filename : str | Path
+    filename : :class:`str` | :class:`pathlib.Path`
         The path to the Excel file, exported from NeuroWorkbench.
 
     Returns
     -------
-    PatientDict
-        A dictionnary of patient IDs to Patient objects.
+    :type:`PatientDict`
+        A dictionnary of patient IDs to :class:`Patient` objects.
 
     Raises
     ------
-    CorruptionError
+    :exc:`CorruptionError`
         Can happen in some cases where the Excel file cannot be read. It can be fixed
         by opening the file in Excel, and saving it as-is (CTRL+S).
     """
@@ -297,21 +303,22 @@ def read_excel(filename: str | Path) -> PatientDict:
 
 
 def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
-    """Merge multiple PatientDict together. Patient data with the same ID are
+    """Merge multiple :type:`PatientDict` together. Patient data with the same ID are
     merged together.
 
     Parameters
     ----------
-    *patient_dicts : PatientDict
-        A sequence of PatientDict, most likely extracted from multiple Excel files,
-        to be merged into one PatientDict
+    *patient_dicts : :type:`PatientDict`
+        A sequence of :type:`PatientDict`, most likely extracted from multiple Excel
+        files, to be merged into one :type:`PatientDict`
 
     Returns
     -------
-    PatientDict
-        A single PatientDict with the data from the provided PatientDict. Patients
-        the same ID with videos and EEGs across multiple PatientDict will be merged
-        together in one Patient instance.
+    :type:`PatientDict`
+        A single :type:`PatientDict` with the data from the provided
+        :type:`PatientDict`. Patients with the same ID with videos and EEGs across
+        multiple :type:`PatientDict` will be merged together in one :class:`Patient`
+        instance.
     """
     merged_patient_dict: PatientDict = {}
     for patient_dict in patient_dicts:
@@ -335,9 +342,20 @@ def read_excels(*filenames: str | Path) -> PatientDict:
     """Read multiple Excel files exported from Nihon Kohden's NeuroWorkbench
     and return the data into a single PatientDict.
 
+    Parameters
+    ----------
+    *filenames : :class:`str` | :class:`pathlib.Path`
+        A sequence of paths to the Excel files, exported from NeuroWorkbench.
+
     Returns
     -------
-    PatientDict
-        A dictionnary of patient IDs to Patient objects.
+    :type:`PatientDict`
+        A dictionnary of patient IDs to :class:`Patient` objects.
+
+    Raises
+    ------
+    :exc:`CorruptionError`
+        Can happen in some cases where the Excel file cannot be read. It can be fixed
+        by opening the file in Excel, and saving it as-is (CTRL+S).
     """
     return merge_patient_dicts(*(read_excel(filename) for filename in filenames))
