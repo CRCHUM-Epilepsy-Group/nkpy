@@ -15,7 +15,9 @@ author = "François Hardy"
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
+    "sphinx_copybutton",
 ]
 
 templates_path = ["_templates"]
@@ -30,3 +32,7 @@ autodoc_typehints = "description"
 
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
+html_sidebars = {"**": []}
+html_theme_options = {"show_toc_level": 2}
+
+intersphinx_mapping = {"py": ("https://docs.python.org/3", None)}
