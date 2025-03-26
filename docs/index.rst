@@ -42,3 +42,7 @@ With ``pip``
 .. code-block:: bash
 
    pip install git+https://github.com/CRCHUM-Epilepsy-Group/nkpy.git
+
+Links
+-----
+- `GitHub Repository <https://github.com/CRCHUM-Epilepsy-Group/nkpy>`_
