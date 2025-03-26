@@ -46,7 +46,7 @@ Manipulate the video information with the :class:`nkpy.VideoFile` objects:
 
 .. code-block:: py
 
-    video = patient.video[0]
+    video = patient.videos[0]
 
     # Get the full path of the file
     print(video.path)
