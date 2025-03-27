@@ -25,6 +25,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # autodoc configuration
 autodoc_typehints = "description"
+autodoc_member_order = "groupwise"
 
 
 # -- Options for HTML output -------------------------------------------------

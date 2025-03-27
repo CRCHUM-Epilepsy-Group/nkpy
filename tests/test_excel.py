@@ -36,26 +36,53 @@ def neuroworkbench_all_patient_dicts(
     return [nkpy.read_excel(filename) for filename in neuroworkbench_all_excels]
 
 
-def test_nkpy_read_excel(neuroworkbench_excel: Path) -> None:
-    _ = nkpy.read_excel(neuroworkbench_excel)
+@pytest.mark.parametrize(
+    ["bool_list", "expected_ranges"],
+    [
+        ([True, True, False, True, True], [range(0, 2), range(3, 5)]),
+        ([False, False, True, True, True], [range(2, 5)]),
+        (
+            [True, False, True, False, False, True],
+            [range(0, 1), range(2, 3), range(5, 6)],
+        ),
+        ([True, True, True, True, True, True], [range(0, 6)]),
+        ([False, False, False, False, False, False], []),
+        ([True] * 50 + [False], [range(0, 50)]),
+    ],
+)
+def test_get_blocks(bool_list: list[bool], expected_ranges: list[range]) -> None:
+    assert nkpy.excel.get_blocks(bool_list) == expected_ranges
 
 
-def test_nkpy_read_excels(neuroworkbench_all_excels: list[Path]) -> None:
+@pytest.mark.parametrize(
+    ["excel_file"], [[f] for f in config.neuroworkbench_files_directory.glob("*.xls")]
+)
+def test_read_excel(excel_file: Path) -> None:
+    patients = nkpy.read_excel(excel_file)
+    assert isinstance(patients, dict)
+
+
+def test_read_excels(neuroworkbench_all_excels: list[Path]) -> None:
     nkpy.read_excels(*neuroworkbench_all_excels)
 
 
-def test_nkpy_read_excel_paths_exist(neuroworkbench_patient_dict: PatientDict) -> None:
+def test_read_excel_video_paths_exist(
+    neuroworkbench_patient_dict: PatientDict,
+) -> None:
     for _, patient in neuroworkbench_patient_dict.items():
         for video in patient.videos:
             assert video.path.exists()
 
 
-def test_all_excel_files(neuroworkbench_all_excels: list[Path]) -> None:
-    for excel_file in neuroworkbench_all_excels:
-        nkpy.read_excel(excel_file)
+def test_read_excel_eeg_paths_exist(
+    neuroworkbench_patient_dict: PatientDict,
+) -> None:
+    for _, patient in neuroworkbench_patient_dict.items():
+        for eeg in patient.eegs:
+            assert eeg.path.exists()
 
 
-def test_nkpy_merge_patient_dicts_all_ids(
+def test_merge_patient_dicts_all_ids(
     neuroworkbench_all_patient_dicts: list[PatientDict],
 ) -> None:
     all_patients = nkpy.excel.merge_patient_dicts(*neuroworkbench_all_patient_dicts)
@@ -66,7 +93,7 @@ def test_nkpy_merge_patient_dicts_all_ids(
         assert (ids & all_patient_ids) == ids
 
 
-def test_nkpy_merge_patient_dicts_all_videos(
+def test_merge_patient_dicts_all_videos(
     neuroworkbench_all_patient_dicts: list[PatientDict],
 ) -> None:
     all_patients = nkpy.excel.merge_patient_dicts(*neuroworkbench_all_patient_dicts)
@@ -82,3 +109,21 @@ def test_nkpy_merge_patient_dicts_all_videos(
                 # patient not in this dict
                 pass
         assert n_videos == len(all_patients[patient_id].videos), patient_id
+
+
+def test_merge_patient_dicts_all_eegs(
+    neuroworkbench_all_patient_dicts: list[PatientDict],
+) -> None:
+    all_patients = nkpy.excel.merge_patient_dicts(*neuroworkbench_all_patient_dicts)
+
+    for patient_id in all_patients.keys():
+        n_eegs: int = 0
+        patient_eegs = []
+        for patient_dict in neuroworkbench_all_patient_dicts:
+            try:
+                n_eegs += len(patient_dict[patient_id].eegs)
+                patient_eegs.extend([e.path for e in patient_dict[patient_id].eegs])
+            except KeyError:
+                # patient not in this dict
+                pass
+        assert n_eegs == len(all_patients[patient_id].eegs), patient_id
