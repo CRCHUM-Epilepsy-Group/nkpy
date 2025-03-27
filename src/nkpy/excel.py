@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import logging
 from copy import copy
 from dataclasses import dataclass, field
@@ -7,10 +8,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import xlrd
+from rich import print
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import TYPE_CHECKING, Any, Self, TypeAlias, TypedDict
+    from typing import Any, Self, TypeAlias, TypedDict
 
     from xlrd.book import Book
     from xlrd.sheet import Cell, Rowinfo, Sheet
@@ -26,6 +28,16 @@ if TYPE_CHECKING:
             "Birth Date": datetime,
             "Start": datetime | None,
             "End": datetime | None,
+        },
+    )
+    EEGInfoDict = TypedDict(
+        "EEGInfoDict",
+        {
+            "Path": str,
+            "Data Name": str,
+            "Start": datetime,
+            "End": datetime,
+            "Exam. No.": str,
         },
     )
     VideoInfoDict = TypedDict(
@@ -75,18 +87,49 @@ class Patient:
         Biological sex of the patient ("Male", "Female", "Unknown").
     birth_date : :class:`datetime.datetime`
         The date of birth of the patient.
+    eegs : list[:class:`EEGFile`]
+        A list of :class:`EEGFile`, containing information about every EEG recording.
     videos : list[:class:`VideoFile`]
         A list of :class:`VideoFile`, containing information about every video recording.
-    eegs : ...
-        Not Implemented.
     """
 
     patient_id: str
     patient_name: str
     sex: str
     birth_date: datetime
+    eegs: list[EEGFile] = field(default_factory=list)
     videos: list[VideoFile] = field(default_factory=list)
-    eegs: ... = field(default_factory=list)
+
+
+@dataclass
+class EEGFile:
+    """Represent an eeg file in the Nihon Kohden's NeuroWorkbench database.
+
+    These do not need to be created manually, and are instead returned by the
+    :func:`read_excel` and :func:`read_excels` functions.
+
+    Attributes
+    ----------
+    path : :class:`pathlib.Path`
+        Full path to the eeg file.
+    start : :class:`datetime.datetime`
+        Start time of the recording.
+    end : :class:`datetime.datetime`
+        End time of the recording.
+    exam_number : :class:`str`
+        The exam number of the EEG recording
+    """
+
+    path: Path
+    start: datetime
+    end: datetime
+    exam_number: str
+
+    def __lt__(self, other: Self) -> bool:
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
+        return self.start < other.start
 
 
 @dataclass
@@ -248,35 +291,77 @@ def read_excel(filename: str | Path) -> PatientDict:
 
     outline_levels = get_outline_levels(patient_sheet)
     patient_blocks = get_blocks([level >= 0 for level in outline_levels])
-    recording_blocks = [
-        get_blocks([level >= 2 for level in outline_levels], patient_block)
+    eeg_blocks = [
+        get_blocks([level == 1 for level in outline_levels], patient_block)
+        for patient_block in patient_blocks
+    ]
+    video_blocks = [
+        get_blocks([level == 2 for level in outline_levels], patient_block)
         for patient_block in patient_blocks
     ]
 
     patients: PatientDict = {}
-    for patient_range, recording_ranges in zip(patient_blocks, recording_blocks):
+    for patient_range, eeg_ranges, video_ranges in zip(
+        patient_blocks, eeg_blocks, video_blocks
+    ):
         patient_info: PatientInfoDict = dict(
             zip(headers[0], parse_cells(patient_sheet.row(patient_range.start)))
         )  # type: ignore
 
-        if 1 not in headers:
-            LOG.debug("Reading headers[1]")
-            headers[1] = parse_cells(patient_sheet.row(patient_range.start + 2))
+        try:
+            patient = patients[patient_info["ID"]]
 
-        patient = Patient(
-            patient_id=patient_info["ID"],
-            patient_name=patient_info["Patient Name"],
-            sex=patient_info["Sex"],
-            birth_date=patient_info["Birth Date"],
+        except KeyError:
+            patient = Patient(
+                patient_id=patient_info["ID"],
+                patient_name=patient_info["Patient Name"],
+                sex=patient_info["Sex"],
+                birth_date=patient_info["Birth Date"],
+            )
+            patients[patient.patient_id] = patient
+
+        for row in itertools.chain(*eeg_ranges):
+            if 1 not in headers:
+                LOG.debug("Reading headers[1]")
+                header_1 = parse_cells(patient_sheet.row(patient_range.start + 2))
+                if header_1[2] != "Protocol Title":
+                    # wrong level-1 header, do not read
+                    LOG.debug(f"Skipping level-1 header at line {row + 1}")
+                    continue
+                else:
+                    headers[1] = header_1
+
+            if patient_sheet.row(row)[1].value not in ("", headers[1][1]):
+                eeg_info: EEGInfoDict = dict(
+                    zip(headers[1], parse_cells(patient_sheet.row(row)))
+                )  # type: ignore
+
+                if not isinstance(eeg_info["Path"], str) or eeg_info["Path"] == "":
+                    # skip some clipped eegs maybe?
+                    continue
+
+                eeg_path = (Path(eeg_info["Path"]) / eeg_info["Data Name"]).with_suffix(
+                    ".EEG"
+                )
+                patients[patient_info["ID"]].eegs.append(
+                    EEGFile(
+                        path=eeg_path,
+                        start=eeg_info["Start"],
+                        end=eeg_info["End"],
+                        exam_number=eeg_info["Exam. No."],
+                    )
+                )
+        LOG.debug(
+            f"Found a total of {len(patients[patient_info['ID']].eegs):>4d} eegs "
+            f"for patient {patient_info['ID']}"
         )
-        patients[patient.patient_id] = patient
 
-        for recordings in recording_ranges:
+        for video_range in video_ranges:
             if 2 not in headers:
                 LOG.debug("Reading headers[2]")
-                headers[2] = parse_cells(patient_sheet.row(recordings.start + 1))
+                headers[2] = parse_cells(patient_sheet.row(video_range.start + 1))
 
-            for i, row in enumerate(recordings):
+            for i, row in enumerate(video_range):
                 if i < 2:
                     # skip the first 2 rows, which are headers
                     continue
@@ -293,10 +378,12 @@ def read_excel(filename: str | Path) -> PatientDict:
                         clipped=video_info["Clipped"],
                     )
                 )
+
         LOG.debug(
             f"Found a total of {len(patients[patient_info['ID']].videos):>4d} videos "
             f"for patient {patient_info['ID']}"
         )
+        patient.eegs.sort()
         patient.videos.sort()
 
     return patients
@@ -324,6 +411,7 @@ def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
     for patient_dict in patient_dicts:
         for patient_id, patient in patient_dict.items():
             try:
+                merged_patient_dict[patient_id].eegs.extend(patient.eegs)
                 merged_patient_dict[patient_id].videos.extend(patient.videos)
             except KeyError:
                 # create a new Patient to avoid multiple reference issues
@@ -332,6 +420,7 @@ def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
                     patient_name=patient.patient_name,
                     sex=patient.sex,
                     birth_date=patient.birth_date,
+                    eegs=copy(patient.eegs),
                     videos=copy(patient.videos),
                 )
 
