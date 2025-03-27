@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import xlrd
-from rich import print
 
 if TYPE_CHECKING:
     from datetime import datetime
