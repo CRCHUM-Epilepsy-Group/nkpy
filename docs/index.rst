@@ -43,6 +43,21 @@ With ``pip``
 
    pip install git+https://github.com/CRCHUM-Epilepsy-Group/nkpy.git
 
+
+Logging
+-------
+
+Enable logging for the module with:
+
+.. code-block:: python
+
+   import logging
+
+   logger = logging.get_Logger("nkpy")
+   logger.setLevel(logging.DEBUG)
+   logger.addHandler(logging.StreamHandler())
+
+
 Links
 -----
 - `GitHub Repository <https://github.com/CRCHUM-Epilepsy-Group/nkpy>`_
