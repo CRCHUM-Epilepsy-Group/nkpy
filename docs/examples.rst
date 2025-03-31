@@ -6,7 +6,7 @@ Reading
 
 Reading an Excel file exported from Nihon Kohden's NeuroWorkbench:
 
-.. code-block:: py
+.. code-block:: python
 
     from pathlib import Path
     import nkpy
@@ -26,7 +26,7 @@ EEGs
 
 Get the EEGs after April 1st, 2024 from a patient with ID :code:`S0123456`:
 
-.. code-block:: py
+.. code-block:: python
 
     from datetime import datetime
 
@@ -44,7 +44,7 @@ Get the EEGs after April 1st, 2024 from a patient with ID :code:`S0123456`:
 
 Manipulate the EEG information with the :class:`nkpy.EEGFile` objects:
 
-.. code-block:: py
+.. code-block:: python
 
     eeg = patient.eegs[0]
 
@@ -65,7 +65,7 @@ Videos
 
 Get the videos after April 1st, 2024 from a patient with ID :code:`S0123456`:
 
-.. code-block:: py
+.. code-block:: python
 
     from datetime import datetime
 
@@ -83,7 +83,7 @@ Get the videos after April 1st, 2024 from a patient with ID :code:`S0123456`:
 
 Manipulate the video information with the :class:`nkpy.VideoFile` objects:
 
-.. code-block:: py
+.. code-block:: python
 
     video = patient.videos[0]
 
