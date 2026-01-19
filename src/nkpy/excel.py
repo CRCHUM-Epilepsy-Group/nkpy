@@ -51,11 +51,11 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
-    "read_excel",
-    "read_excels",
     "CorruptionError",
     "Patient",
     "VideoFile",
+    "read_excel",
+    "read_excels",
 ]
 
 LOG = logging.getLogger(__name__)
@@ -89,7 +89,9 @@ class Patient:
     eegs : list[:class:`EEGFile`]
         A list of :class:`EEGFile`, containing information about every EEG recording.
     videos : list[:class:`VideoFile`]
-        A list of :class:`VideoFile`, containing information about every video recording.
+        A list of :class:`VideoFile`, containing information about every video
+        recording.
+
     """
 
     patient_id: str
@@ -117,6 +119,7 @@ class EEGFile:
         End time of the recording.
     exam_number : :class:`str`
         The exam number of the EEG recording
+
     """
 
     path: Path
@@ -148,6 +151,7 @@ class VideoFile:
         End time of the recording.
     clipped : :class:`bool`
         If the video is a clipped event (True) or a full recording (False).
+
     """
 
     path: Path
@@ -182,6 +186,7 @@ def get_blocks(bool_list: list[bool], target_range: range | None = None) -> list
     -------
     list[range]
         A list of range where the continuous blocks of True values are.
+
     """
     if target_range is None:
         target_range = range(len(bool_list))
@@ -195,10 +200,9 @@ def get_blocks(bool_list: list[bool], target_range: range | None = None) -> list
         if value:
             if start is None:
                 start = i
-        else:
-            if start is not None:
-                blocks.append(range(start, i))
-                start = None
+        elif start is not None:
+            blocks.append(range(start, i))
+            start = None
 
     if start is not None:
         blocks.append(range(start, target_range.stop))
@@ -218,6 +222,7 @@ def get_outline_levels(sheet: Sheet) -> list[int]:
     -------
     list[int]
         A list of outline levels for each row in the Excel sheet.
+
     """
     # Scanning for blocks based on collapse levels
     outline_levels: list[int] = []
@@ -237,8 +242,8 @@ def get_outline_levels(sheet: Sheet) -> list[int]:
     return outline_levels
 
 
-def read_excel(filename: str | Path) -> PatientDict:
-    """Read an Excel sheet exported from Nihon Kohden's NeuroWorkbench
+def read_excel(filename: str | Path) -> PatientDict:  # noqa: C901, PLR0915
+    """Read an Excel sheet exported from Nihon Kohden's NeuroWorkbench.
 
     Parameters
     ----------
@@ -255,16 +260,18 @@ def read_excel(filename: str | Path) -> PatientDict:
     :exc:`CorruptionError`
         Can happen in some cases where the Excel file cannot be read. It can be fixed
         by opening the file in Excel, and saving it as-is (CTRL+S).
+
     """
     try:
         workbook: Book = xlrd.open_workbook(str(filename), formatting_info=True)
         LOG.debug(f"Opened workbook {filename}")
 
     except xlrd.compdoc.CompDocError as e:
-        raise CorruptionError(
+        msg = (
             "Excel file is corrupted. Try opening it and saving "
             "it again with Excel to fix."
-        ) from e
+        )
+        raise CorruptionError(msg) from e
 
     def parse_cells(cells: list[Cell]) -> list[Any]:
         cell_values: list[Any] = []
@@ -283,7 +290,7 @@ def read_excel(filename: str | Path) -> PatientDict:
         return cell_values
 
     patient_sheet = workbook.sheet_by_index(0)  # only one sheet anyway
-    # we have 3 levels of ehaders, keep them in a dict for future reference
+    # we have 3 levels of headers, keep them in a dict for future reference
     headers: dict[int, list[str | float | datetime]] = {}
     LOG.debug("Reading headers[0]")
     headers[0] = parse_cells(patient_sheet.row(0))
@@ -301,11 +308,18 @@ def read_excel(filename: str | Path) -> PatientDict:
 
     patients: PatientDict = {}
     for patient_range, eeg_ranges, video_ranges in zip(
-        patient_blocks, eeg_blocks, video_blocks
+        patient_blocks,
+        eeg_blocks,
+        video_blocks,
+        strict=False,
     ):
         patient_info: PatientInfoDict = dict(
-            zip(headers[0], parse_cells(patient_sheet.row(patient_range.start)))
-        )  # type: ignore
+            zip(
+                headers[0],
+                parse_cells(patient_sheet.row(patient_range.start)),
+                strict=False,
+            )
+        )
 
         try:
             patient = patients[patient_info["ID"]]
@@ -320,20 +334,20 @@ def read_excel(filename: str | Path) -> PatientDict:
             patients[patient.patient_id] = patient
 
         for row in itertools.chain(*eeg_ranges):
-            if 1 not in headers:
-                LOG.debug("Reading headers[1]")
-                header_1 = parse_cells(patient_sheet.row(patient_range.start + 2))
-                if header_1[2] != "Protocol Title":
-                    # wrong level-1 header, do not read
-                    LOG.debug(f"Skipping level-1 header at line {row + 1}")
-                    continue
-                else:
-                    headers[1] = header_1
+            # if 1 not in headers:
+            LOG.debug("Reading headers[1]")
+            header_1 = parse_cells(patient_sheet.row(patient_range.start + 2))
+            if header_1[2] != "Protocol Title":
+                # wrong level-1 header, do not read
+                LOG.debug(f"Skipping level-1 header at line {row + 1}")
+                continue
+
+            headers[1] = header_1
 
             if patient_sheet.row(row)[1].value not in ("", headers[1][1]):
                 eeg_info: EEGInfoDict = dict(
-                    zip(headers[1], parse_cells(patient_sheet.row(row)))
-                )  # type: ignore
+                    zip(headers[1], parse_cells(patient_sheet.row(row)), strict=False)
+                )
 
                 if not isinstance(eeg_info["Path"], str) or eeg_info["Path"] == "":
                     # skip some clipped eegs maybe?
@@ -356,9 +370,9 @@ def read_excel(filename: str | Path) -> PatientDict:
         )
 
         for video_range in video_ranges:
-            if 2 not in headers:
-                LOG.debug("Reading headers[2]")
-                headers[2] = parse_cells(patient_sheet.row(video_range.start + 1))
+            # if 2 not in headers:
+            LOG.debug("Reading headers[2]")
+            headers[2] = parse_cells(patient_sheet.row(video_range.start + 1))
 
             for i, row in enumerate(video_range):
                 if i < 2:
@@ -366,8 +380,8 @@ def read_excel(filename: str | Path) -> PatientDict:
                     continue
 
                 video_info: VideoInfoDict = dict(
-                    zip(headers[2], parse_cells(patient_sheet.row(row)))
-                )  # type: ignore
+                    zip(headers[2], parse_cells(patient_sheet.row(row)), strict=False)
+                )
 
                 patients[patient_info["ID"]].videos.append(
                     VideoFile(
@@ -389,8 +403,9 @@ def read_excel(filename: str | Path) -> PatientDict:
 
 
 def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
-    """Merge multiple :type:`PatientDict` together. Patient data with the same ID are
-    merged together.
+    """Merge multiple :type:`PatientDict` together.
+
+    Patient data with the same ID are merged together.
 
     Parameters
     ----------
@@ -405,6 +420,7 @@ def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
         :type:`PatientDict`. Patients with the same ID with videos and EEGs across
         multiple :type:`PatientDict` will be merged together in one :class:`Patient`
         instance.
+
     """
     merged_patient_dict: PatientDict = {}
     for patient_dict in patient_dicts:
@@ -427,8 +443,7 @@ def merge_patient_dicts(*patient_dicts: PatientDict) -> PatientDict:
 
 
 def read_excels(*filenames: str | Path) -> PatientDict:
-    """Read multiple Excel files exported from Nihon Kohden's NeuroWorkbench
-    and return the data into a single PatientDict.
+    """Read multiple Excel files exported from Nihon Kohden's NeuroWorkbench.
 
     Parameters
     ----------
@@ -445,5 +460,6 @@ def read_excels(*filenames: str | Path) -> PatientDict:
     :exc:`CorruptionError`
         Can happen in some cases where the Excel file cannot be read. It can be fixed
         by opening the file in Excel, and saving it as-is (CTRL+S).
+
     """
     return merge_patient_dicts(*(read_excel(filename) for filename in filenames))

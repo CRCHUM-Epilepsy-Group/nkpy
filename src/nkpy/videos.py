@@ -36,6 +36,7 @@ def get_patient_videos(
     -------
     list[:class:`VideoFile`]
         List of the selected :class:`VideoFile`.
+
     """
     selected_videos = patient.videos
 

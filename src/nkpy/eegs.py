@@ -36,6 +36,7 @@ def get_patient_eegs(
     -------
     list[:class:`EEGFile`]
         List of the selected :class:`EEGFile`.
+
     """
     selected_eegs = patient.eegs
 
