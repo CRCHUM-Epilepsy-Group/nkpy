@@ -313,7 +313,7 @@ def read_excel(filename: str | Path) -> PatientDict:
         except KeyError:
             patient = Patient(
                 patient_id=patient_info["ID"],
-                patient_name=patient_info["Patient Name"],
+                patient_name=patient_info.get("Patient Name", patient_info["ID"]),
                 sex=patient_info["Sex"],
                 birth_date=patient_info["Birth Date"],
             )
